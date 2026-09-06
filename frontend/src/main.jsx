@@ -15,17 +15,19 @@ import MenuPage from "./pages/MenuPage.jsx";
 import OrderPage from "./pages/OrderPage.jsx";
 
 import AdminLogin from "./pages/AdminLogin.jsx";
+import AdminSetup from "./pages/AdminSetup.jsx";
 import AdminDashboard from "./pages/AdminDashboard.jsx";
 
 import { CartProvider } from "./context/CartContext.jsx";
-
 
 // ======================================================
 // PROTECTED ADMIN ROUTE
 // ======================================================
 
 function ProtectedAdmin() {
-  const token = localStorage.getItem("adminToken");
+  const token = localStorage.getItem(
+    "adminToken",
+  );
 
   if (!token) {
     return (
@@ -39,18 +41,16 @@ function ProtectedAdmin() {
   return <AdminDashboard />;
 }
 
-
 // ======================================================
-// APPLICATION
+// APP
 // ======================================================
 
 function App() {
   return (
     <Routes>
-
-      {/* ==================================================
+      {/* ==========================================
           CUSTOMER
-         ================================================== */}
+         ========================================== */}
 
       <Route
         path="/"
@@ -67,20 +67,23 @@ function App() {
         element={<OrderPage />}
       />
 
-
-      {/* ==================================================
-          ADMIN LOGIN
-         ================================================== */}
+      {/* ==========================================
+          ADMIN AUTH
+         ========================================== */}
 
       <Route
         path="/admin/login"
         element={<AdminLogin />}
       />
 
+      <Route
+        path="/admin/setup"
+        element={<AdminSetup />}
+      />
 
-      {/* ==================================================
-          ADMIN
-         ================================================== */}
+      {/* ==========================================
+          ADMIN DASHBOARD
+         ========================================== */}
 
       <Route
         path="/admin"
@@ -97,10 +100,9 @@ function App() {
         element={<ProtectedAdmin />}
       />
 
-
-      {/* ==================================================
-          404
-         ================================================== */}
+      {/* ==========================================
+          FALLBACK
+         ========================================== */}
 
       <Route
         path="*"
@@ -111,30 +113,22 @@ function App() {
           />
         }
       />
-
     </Routes>
   );
 }
-
 
 // ======================================================
 // RENDER
 // ======================================================
 
 createRoot(
-  document.getElementById("root")
+  document.getElementById("root"),
 ).render(
   <React.StrictMode>
-
     <BrowserRouter>
-
       <CartProvider>
-
         <App />
-
       </CartProvider>
-
     </BrowserRouter>
-
-  </React.StrictMode>
+  </React.StrictMode>,
 );

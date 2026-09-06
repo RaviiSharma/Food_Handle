@@ -1,21 +1,23 @@
 import React, { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import api from "../api.js";
 
-export default function AdminLogin() {
+export default function AdminSetup() {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] =
+    useState("");
 
-  const [loading, setLoading] = useState(false);
-  const [checkingSetup, setCheckingSetup] = useState(true);
+  const [checking, setChecking] = useState(true);
+  const [creating, setCreating] = useState(false);
+
   const [error, setError] = useState("");
 
   // ======================================================
-  // CHECK SETUP STATUS
+  // CHECK WHETHER SETUP IS STILL REQUIRED
   // ======================================================
 
   useEffect(() => {
@@ -32,8 +34,8 @@ export default function AdminLogin() {
         const setupRequired =
           response.data?.setupRequired === true;
 
-        if (setupRequired) {
-          navigate("/admin/setup", {
+        if (!setupRequired) {
+          navigate("/admin/login", {
             replace: true,
           });
 
@@ -53,7 +55,7 @@ export default function AdminLogin() {
         );
       } finally {
         if (mounted) {
-          setCheckingSetup(false);
+          setChecking(false);
         }
       }
     }
@@ -66,13 +68,13 @@ export default function AdminLogin() {
   }, [navigate]);
 
   // ======================================================
-  // LOGIN
+  // CREATE ADMIN
   // ======================================================
 
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (loading) return;
+    if (creating) return;
 
     setError("");
 
@@ -80,8 +82,33 @@ export default function AdminLogin() {
       .trim()
       .toLowerCase();
 
+    // --------------------------------------------------
+    // FRONTEND VALIDATION
+    // --------------------------------------------------
+
     if (!cleanUsername) {
       setError("Username is required.");
+      return;
+    }
+
+    if (cleanUsername.length < 3) {
+      setError(
+        "Username must contain at least 3 characters.",
+      );
+      return;
+    }
+
+    if (cleanUsername.length > 50) {
+      setError(
+        "Username cannot exceed 50 characters.",
+      );
+      return;
+    }
+
+    if (!/^[a-z0-9._-]+$/.test(cleanUsername)) {
+      setError(
+        "Username can contain only letters, numbers, dot, underscore and hyphen.",
+      );
       return;
     }
 
@@ -90,14 +117,45 @@ export default function AdminLogin() {
       return;
     }
 
+    if (password.length < 8) {
+      setError(
+        "Password must contain at least 8 characters.",
+      );
+      return;
+    }
+
+    if (password.length > 128) {
+      setError(
+        "Password cannot exceed 128 characters.",
+      );
+      return;
+    }
+
+    if (!confirmPassword) {
+      setError(
+        "Please confirm your password.",
+      );
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    // --------------------------------------------------
+    // API
+    // --------------------------------------------------
+
     try {
-      setLoading(true);
+      setCreating(true);
 
       const response = await api.post(
-        "/auth/login",
+        "/auth/setup",
         {
           username: cleanUsername,
           password,
+          confirmPassword,
         },
       );
 
@@ -109,16 +167,15 @@ export default function AdminLogin() {
         );
       }
 
-      // ==================================================
-      // STORE TOKEN
-      // ==================================================
+      // ------------------------------------------------
+      // SAVE TOKEN
+      // ------------------------------------------------
 
       localStorage.setItem(
         "adminToken",
         token,
       );
 
-      // Optional user information
       const admin = response.data?.admin;
 
       if (admin) {
@@ -128,47 +185,33 @@ export default function AdminLogin() {
         );
       }
 
-      // ==================================================
-      // REDIRECT
-      // ==================================================
+      // ------------------------------------------------
+      // GO TO DASHBOARD
+      // ------------------------------------------------
 
-      const from =
-        location.state?.from?.pathname;
-
-      if (
-        from &&
-        from.startsWith("/admin") &&
-        from !== "/admin/login" &&
-        from !== "/admin/setup"
-      ) {
-        navigate(from, {
-          replace: true,
-        });
-      } else {
-        navigate("/admin/orders", {
-          replace: true,
-        });
-      }
+      navigate("/admin/orders", {
+        replace: true,
+      });
     } catch (error) {
       console.error(
-        "Admin login error:",
+        "Admin setup error:",
         error,
       );
 
       setError(
         error.response?.data?.message ||
-          "Unable to login. Please try again.",
+          "Unable to create admin account. Please try again.",
       );
     } finally {
-      setLoading(false);
+      setCreating(false);
     }
   }
 
   // ======================================================
-  // LOADING SETUP CHECK
+  // CHECKING
   // ======================================================
 
-  if (checkingSetup) {
+  if (checking) {
     return (
       <div style={styles.page}>
         <div style={styles.card}>
@@ -179,7 +222,7 @@ export default function AdminLogin() {
           </h1>
 
           <p style={styles.subtitle}>
-            Checking admin setup...
+            Checking setup status...
           </p>
 
           <div style={styles.loader} />
@@ -204,18 +247,38 @@ export default function AdminLogin() {
         </h1>
 
         <p style={styles.subtitle}>
-          Admin Panel
+          First-time Admin Setup
         </p>
 
         <div style={styles.divider} />
 
         <h2 style={styles.heading}>
-          Admin Login
+          Create Admin Account
         </h2>
 
         <p style={styles.description}>
-          Sign in to manage your restaurant.
+          This account will be used to manage
+          your restaurant menu, orders and table
+          QR codes.
         </p>
+
+        {/* SECURITY NOTICE */}
+
+        <div style={styles.notice}>
+          <span>🔐</span>
+
+          <div>
+            <strong style={styles.noticeTitle}>
+              One-time setup
+            </strong>
+
+            <p style={styles.noticeText}>
+              After this account is created,
+              public admin signup will be
+              disabled.
+            </p>
+          </div>
+        </div>
 
         {/* ERROR */}
 
@@ -236,7 +299,7 @@ export default function AdminLogin() {
 
           <div style={styles.field}>
             <label style={styles.label}>
-              Username
+              Admin Username
             </label>
 
             <input
@@ -245,13 +308,19 @@ export default function AdminLogin() {
               onChange={(event) =>
                 setUsername(event.target.value)
               }
-              placeholder="Enter username"
+              placeholder="e.g. admin"
               autoComplete="username"
               autoCapitalize="none"
               spellCheck="false"
-              disabled={loading}
+              disabled={creating}
+              maxLength={50}
               style={styles.input}
             />
+
+            <small style={styles.help}>
+              3–50 characters. Letters, numbers,
+              dot, underscore and hyphen only.
+            </small>
           </div>
 
           {/* PASSWORD */}
@@ -267,9 +336,33 @@ export default function AdminLogin() {
               onChange={(event) =>
                 setPassword(event.target.value)
               }
-              placeholder="Enter password"
-              autoComplete="current-password"
-              disabled={loading}
+              placeholder="Minimum 8 characters"
+              autoComplete="new-password"
+              disabled={creating}
+              maxLength={128}
+              style={styles.input}
+            />
+          </div>
+
+          {/* CONFIRM PASSWORD */}
+
+          <div style={styles.field}>
+            <label style={styles.label}>
+              Confirm Password
+            </label>
+
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(event) =>
+                setConfirmPassword(
+                  event.target.value,
+                )
+              }
+              placeholder="Re-enter password"
+              autoComplete="new-password"
+              disabled={creating}
+              maxLength={128}
               style={styles.input}
             />
           </div>
@@ -278,23 +371,23 @@ export default function AdminLogin() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={creating}
             style={{
               ...styles.button,
-              opacity: loading ? 0.65 : 1,
+              opacity: creating ? 0.65 : 1,
             }}
           >
-            {loading
-              ? "Signing in..."
-              : "Sign In"}
+            {creating
+              ? "Creating Account..."
+              : "Create Admin Account"}
           </button>
         </form>
 
         <Link
-          to="/"
+          to="/admin/login"
           style={styles.backLink}
         >
-          ← Back to Food Center
+          Already have an admin account? Login
         </Link>
       </div>
     </div>
@@ -322,7 +415,7 @@ const styles = {
 
   card: {
     width: "100%",
-    maxWidth: "420px",
+    maxWidth: "460px",
     background: "#ffffff",
     border: "1px solid #e7e7ea",
     borderRadius: "18px",
@@ -374,9 +467,35 @@ const styles = {
   },
 
   description: {
-    margin: "6px 0 20px",
+    margin: "6px 0 19px",
     color: "#777780",
     fontSize: "13px",
+    lineHeight: 1.55,
+  },
+
+  notice: {
+    display: "flex",
+    gap: "10px",
+    alignItems: "flex-start",
+    padding: "12px 13px",
+    marginBottom: "17px",
+    borderRadius: "10px",
+    border: "1px solid #e4e4e7",
+    background: "#f8f8f9",
+    color: "#303038",
+  },
+
+  noticeTitle: {
+    display: "block",
+    fontSize: "12px",
+    marginBottom: "3px",
+  },
+
+  noticeText: {
+    margin: 0,
+    color: "#707078",
+    fontSize: "11px",
+    lineHeight: 1.45,
   },
 
   error: {
@@ -424,6 +543,12 @@ const styles = {
     fontSize: "14px",
   },
 
+  help: {
+    color: "#85858d",
+    fontSize: "11px",
+    lineHeight: 1.4,
+  },
+
   button: {
     width: "100%",
     minHeight: "47px",
@@ -453,6 +578,5 @@ const styles = {
     border: "3px solid #e5e5e7",
     borderTopColor: "#111113",
     borderRadius: "50%",
-    animation: "none",
   },
 };
